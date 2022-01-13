@@ -3,8 +3,6 @@ use bevy::tasks::IoTaskPool;
 use bevy::{core::FixedTimestep, prelude::*};
 use bevy_backroll::{backroll::*, *};
 use bytemuck::{Pod, Zeroable};
-use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::ops::Deref;
 use steamworks::{Client, SteamId};
 
@@ -43,10 +41,6 @@ impl Config for BackrollConfig {
 #[derive(Clone, PartialEq, Hash)]
 pub struct GameState {}
 
-struct Materials {
-    player_material: Handle<ColorMaterial>,
-}
-
 const MATCH_UPDATE_LABEL: &str = "MATCH_UPDATE";
 
 const DELTA_TIME: f32 = 1.0 / 60.0; // in ms
@@ -71,7 +65,10 @@ struct StartupNetworkConfig {
     remote: SteamId,
 }
 
-fn sample_input(handle: In<PlayerHandle>, keyboard_input: Res<Input<KeyCode>>) -> PlayerInputFrame {
+fn sample_input(
+    _handle: In<PlayerHandle>,
+    keyboard_input: Res<Input<KeyCode>>,
+) -> PlayerInputFrame {
     let mut local_input = PlayerInputFrame::empty();
 
     // local input handling
@@ -101,23 +98,15 @@ fn save_world() -> GameState {
     GameState {}
 }
 
-fn load_world(state: In<GameState>) {
+fn load_world(_state: In<GameState>) {
     //println!("Load da world");
 }
 
-fn setup_game(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
+fn setup_game(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-    commands.insert_resource(Materials {
-        player_material: materials.add(Color::rgb(0.7, 0.7, 0.7).into()),
-    });
 }
 
-fn spawn_players(
-    mut commands: Commands,
-    config: Res<StartupNetworkConfig>,
-    pool: Res<IoTaskPool>,
-    materials: Res<Materials>,
-) {
+fn spawn_players(mut commands: Commands, config: Res<StartupNetworkConfig>, pool: Res<IoTaskPool>) {
     let socket = SteamP2PManager::bind(pool.deref().deref().clone(), config.bind.clone());
     let peer = socket.connect(SteamConnectionConfig::unbounded(config.remote));
 
@@ -186,8 +175,9 @@ fn player_movement(
 }
 
 fn start_app(player_num: usize) {
-    let (client, single) = Client::init().unwrap();
-    let remote_addr = client.user().steam_id();
+    let (client, _single) = Client::init().unwrap();
+    let remote_addr = SteamId::from_raw(76561199234689348);
+
     let bind_addr = client;
 
     App::new()
@@ -205,19 +195,9 @@ fn start_app(player_num: usize) {
 }
 fn main() {
     let mut args = std::env::args();
-    let base = args.next().unwrap();
+    let _ = args.next();
     if let Some(player_num) = args.next() {
+        println!("{}", player_num);
         start_app(player_num.parse().unwrap());
-    } else {
-        let mut child_1 = std::process::Command::new(base.clone())
-            .args(&["0"])
-            .spawn()
-            .unwrap();
-        let mut child_2 = std::process::Command::new(base)
-            .args(&["1"])
-            .spawn()
-            .unwrap();
-        child_1.wait().unwrap();
-        child_2.wait().unwrap();
     }
 }
