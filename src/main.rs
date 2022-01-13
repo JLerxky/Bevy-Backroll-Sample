@@ -1,4 +1,4 @@
-use backroll_transport_udp::*;
+use backroll_transport_steam::*;
 use bevy::tasks::IoTaskPool;
 use bevy::{core::FixedTimestep, prelude::*};
 use bevy_backroll::{backroll::*, *};
@@ -6,6 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::ops::Deref;
+use steamworks::{Client, SteamId};
 
 pub type P2PSession = bevy_backroll::backroll::P2PSession<BackrollConfig>;
 
@@ -14,7 +15,7 @@ pub struct BackrollConfig;
 #[macro_use]
 extern crate bitflags;
 
-#[derive(Clone)]
+#[derive(Clone, Component)]
 pub struct Player {
     //position: Vec2,
     //velocity: Vec2,
@@ -53,9 +54,8 @@ const DELTA_TIME: f32 = 1.0 / 60.0; // in ms
 pub struct OurBackrollPlugin;
 
 impl Plugin for OurBackrollPlugin {
-    fn build(&self, builder: &mut AppBuilder) {
-        builder
-            .add_plugin(BackrollPlugin::<BackrollConfig>::default())
+    fn build(&self, app: &mut App) {
+        app.add_plugin(BackrollPlugin::<BackrollConfig>::default())
             .with_rollback_run_criteria::<BackrollConfig, _>(
                 FixedTimestep::step(DELTA_TIME.into()).with_label(MATCH_UPDATE_LABEL),
             )
@@ -65,11 +65,10 @@ impl Plugin for OurBackrollPlugin {
     }
 }
 
-#[derive(Debug)]
 struct StartupNetworkConfig {
     client: usize,
-    bind: SocketAddr,
-    remote: SocketAddr,
+    bind: Client,
+    remote: SteamId,
 }
 
 fn sample_input(handle: In<PlayerHandle>, keyboard_input: Res<Input<KeyCode>>) -> PlayerInputFrame {
@@ -119,8 +118,8 @@ fn spawn_players(
     pool: Res<IoTaskPool>,
     materials: Res<Materials>,
 ) {
-    let socket = UdpManager::bind(pool.deref().deref().clone(), config.bind).unwrap();
-    let peer = socket.connect(UdpConnectionConfig::unbounded(config.remote));
+    let socket = SteamP2PManager::bind(pool.deref().deref().clone(), config.bind.clone());
+    let peer = socket.connect(SteamConnectionConfig::unbounded(config.remote));
 
     commands.insert_resource(socket);
 
@@ -128,8 +127,7 @@ fn spawn_players(
 
     commands
         .spawn_bundle(SpriteBundle {
-            material: materials.player_material.clone(),
-            sprite: Sprite::new(Vec2::new(10.0, 10.0)),
+            // sprite: Sprite::default(),
             ..Default::default()
         })
         // make sure to clone the player handles for reference stuff
@@ -148,8 +146,7 @@ fn spawn_players(
 
     commands
         .spawn_bundle(SpriteBundle {
-            material: materials.player_material.clone(),
-            sprite: Sprite::new(Vec2::new(10.0, 10.0)),
+            // sprite: Sprite::new(Vec2::new(10.0, 10.0)),
             ..Default::default()
         })
         .insert(if config.client == 1 {
@@ -189,19 +186,11 @@ fn player_movement(
 }
 
 fn start_app(player_num: usize) {
-    let bind_addr = if player_num == 0 {
-        "127.0.0.1:4001".parse().unwrap()
-    } else {
-        "127.0.0.1:4002".parse().unwrap()
-    };
+    let (client, single) = Client::init().unwrap();
+    let remote_addr = client.user().steam_id();
+    let bind_addr = client;
 
-    let remote_addr = if player_num == 0 {
-        "127.0.0.1:4002".parse().unwrap()
-    } else {
-        "127.0.0.1:4001".parse().unwrap()
-    };
-
-    App::build()
+    App::new()
         .add_startup_system(setup_game.system())
         .add_startup_stage("game_setup", SystemStage::single(spawn_players.system()))
         .add_plugins(DefaultPlugins)
@@ -211,7 +200,7 @@ fn start_app(player_num: usize) {
             bind: bind_addr,
             remote: remote_addr,
         })
-        .with_rollback_system::<BackrollConfig, _>(player_movement.system())
+        .with_rollback_system::<BackrollConfig, _, _>(player_movement.system())
         .run();
 }
 fn main() {

@@ -2,15 +2,17 @@
 name = "bevy_backroll_sample"
 version = "0.1.0"
 authors = ["Srayan Jana <valorzard.kiko@outlook.com>"]
-edition = "2018"
+edition = "2021"
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.5.0", features = ["dynamic"] }
-bevy_egui = "0.5"
-bevy_backroll = "0.1.0"
-backroll_transport_udp = "0.1.0"
-tracing-subscriber = "0.2.18"
+bevy = { version = "0.6" }
+bevy_egui = "0.10"
+bevy_backroll = { git = "https://github.com/JLerxky/backroll-rs.git", branch = "v153a", features = ["steam"] }
+backroll_transport_steam = { git = "https://github.com/JLerxky/backroll-rs.git", branch = "v153a" }
+tracing-subscriber = "0.3"
+steamworks = { git = "https://github.com/JLerxky/steamworks-rs.git", branch = "v153a" }
 bitflags = "1.2.1"
 bytemuck = {version = "1.5.1", features = ["derive"]}
